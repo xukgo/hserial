@@ -19,6 +19,7 @@ func (this *SerialPort) Recv(headTimeout, chunkTimeout int, checkFunc CheckDataC
 	var totalLen = 0
 	var buff = make([]byte, 0, 1024)
 	var temp = make([]byte, 256) //serialPort.Read(temp)读的是数组类型而不是切片
+	var lastReadValidAt time.Time
 
 	err = this.sport.SetReadTimeout(0)
 	if err != nil {
@@ -30,22 +31,23 @@ func (this *SerialPort) Recv(headTimeout, chunkTimeout int, checkFunc CheckDataC
 	startAt := time.Now()
 	tryCount := 0
 	for {
-		headWaitSleep(tryCount)
 		readLen, err = this.sport.Read(temp)
 		if readLen <= 0 {
 			durMs := time.Since(startAt).Milliseconds()
 			if  durMs < int64(headTimeout) {
+				headWaitSleep(tryCount)
 				continue
 			}
 
 			pack.HeadDuration = int(durMs)
 			return nil, pack, nil
 		}
+
+		lastReadValidAt = time.Now()
 		buff = append(buff, temp[:readLen]...)
 		break
 	}
 
-	var lastReadValidAt = time.Now()
 	startReadContentAt := lastReadValidAt
 	pack.HeadDuration = int(lastReadValidAt.Sub(startAt).Milliseconds())
 	//fmt.Printf("head duration: %dms\r\n", pack.HeadDuration)
